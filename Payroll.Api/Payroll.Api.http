@@ -1,0 +1,208 @@
+@host = http://localhost:5283
+
+# 1. LIST all employees
+GET {{host}}/api/employees
+
+###
+
+# 2. CREATE a second employee (a spare one for the delete test)
+POST {{host}}/api/employees
+Content-Type: application/json
+
+{
+  "employeeCode": "EMP002",
+  "firstName": "Ravi",
+  "lastName": "Menon",
+  "email": "ravi@example.com",
+  "dateOfJoining": "2026-10-05",
+  "basicSalary": 30000
+}
+
+###
+
+# 3. GET ONE employee (change the 1 to a real id)
+GET {{host}}/api/employees/1
+
+###
+
+# 4. UPDATE an employee (change the 1 to a real id)
+PUT {{host}}/api/employees/1
+Content-Type: application/json
+
+{
+  "employeeCode": "EMP001",
+  "firstName": "Asha",
+  "lastName": "Kumar",
+  "email": "asha@example.com",
+  "dateOfJoining": "2026-10-01",
+  "basicSalary": 50000,
+  "isActive": true
+}
+
+###
+
+# 5. DELETE an employee (change the 1 to a real id)
+DELETE {{host}}/api/employees/2
+
+###
+
+# 6. CREATE a department
+POST {{host}}/api/departments
+Content-Type: application/json
+
+{
+  "name": "Finance"
+}
+
+###
+
+# 7. LIST departments
+GET {{host}}/api/departments
+
+###
+
+# 8. Assign Asha (id 1) to a department (change departmentId to a real department id)
+PUT {{host}}/api/employees/1
+Content-Type: application/json
+
+{
+  "employeeCode": "EMP001",
+  "firstName": "Asha",
+  "lastName": "Kumar",
+  "email": "asha@example.com",
+  "dateOfJoining": "2026-10-01",
+  "basicSalary": 50000,
+  "isActive": true,
+  "departmentId": 1
+}
+
+###
+
+# 9. BAD employee: invalid email and negative salary (should give 400)
+POST {{host}}/api/employees
+Content-Type: application/json
+
+{
+  "employeeCode": "EMP099",
+  "firstName": "Test",
+  "lastName": "User",
+  "email": "not-an-email",
+  "dateOfJoining": "2026-10-01",
+  "basicSalary": -5
+}
+
+###
+
+# 10. BAD department id (should give 400, not 500)
+POST {{host}}/api/employees
+Content-Type: application/json
+
+{
+  "employeeCode": "EMP098",
+  "firstName": "Test",
+  "lastName": "User",
+  "email": "test@example.com",
+  "dateOfJoining": "2026-10-01",
+  "basicSalary": 20000,
+  "departmentId": 999
+}
+
+###
+
+# 11. Salary components
+POST {{host}}/api/salarycomponents
+Content-Type: application/json
+
+{ "name": "HRA", "type": "Earning", "calculation": "PercentOfBasic", "value": 40 }
+
+###
+
+POST {{host}}/api/salarycomponents
+Content-Type: application/json
+
+{ "name": "Transport Allowance", "type": "Earning", "calculation": "Fixed", "value": 1600 }
+
+###
+
+POST {{host}}/api/salarycomponents
+Content-Type: application/json
+
+{ "name": "Provident Fund", "type": "Deduction", "calculation": "PercentOfBasic", "value": 12 }
+
+###
+
+POST {{host}}/api/salarycomponents
+Content-Type: application/json
+
+{ "name": "Professional Tax", "type": "Deduction", "calculation": "Fixed", "value": 200 }
+
+###
+
+GET {{host}}/api/salarycomponents
+
+###
+
+# 12. Attendance: 2 loss-of-pay days for employee 1 in October 2026
+POST {{host}}/api/attendance
+Content-Type: application/json
+
+{ "employeeId": 1, "year": 2026, "month": 10, "lossOfPayDays": 2 }
+
+###
+
+GET {{host}}/api/attendance?year=2026&month=10
+
+###
+
+# 13. RUN payroll for October 2026
+POST {{host}}/api/payroll/run?year=2026&month=10
+
+###
+
+# 14. List all payroll runs
+GET {{host}}/api/payroll
+
+###
+
+# 15. One run with all payslips (change 1 to the real run id)
+GET {{host}}/api/payroll/1
+
+###
+
+# 16. Delete a run so you can run it again (change 1 to the real run id)
+DELETE {{host}}/api/payroll/1
+
+###
+
+POST {{host}}/api/salarycomponents
+Content-Type: application/json
+
+{ "name": "HRA", "type": "Earning", "calculation": "PercentOfBasic", "value": 40 }
+
+###
+
+POST {{host}}/api/salarycomponents
+Content-Type: application/json
+
+{ "name": "Transport Allowance", "type": "Earning", "calculation": "Fixed", "value": 1600 }
+
+###
+
+POST {{host}}/api/salarycomponents
+Content-Type: application/json
+
+{ "name": "Provident Fund", "type": "Deduction", "calculation": "PercentOfBasic", "value": 12 }
+
+###
+
+POST {{host}}/api/salarycomponents
+Content-Type: application/json
+
+{ "name": "Professional Tax", "type": "Deduction", "calculation": "Fixed", "value": 200 }
+
+###
+
+POST {{host}}/api/attendance
+Content-Type: application/json
+
+{ "employeeId": 1, "year": 2026, "month": 10, "lossOfPayDays": 2 }

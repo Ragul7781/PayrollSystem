@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Payroll System</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 950px; margin: 20px auto; padding: 0 10px; }
+  h2 { border-bottom: 2px solid #444; padding-bottom: 4px; margin-top: 30px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+  th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+  th { background: #eee; }
+  input, select, button { padding: 6px; margin: 3px; }
+  #msg { color: #b00; font-weight: bold; min-height: 20px; }
+</style>
+</head>
+<body>
+<h1>Payroll Management System</h1>
+<div id="msg"></div>
+
+<h2>Departments</h2>
+<input id="deptName" placeholder="Department name">
+<button onclick="addDepartment()">Add department</button>
+<div id="deptList"></div>
+
+<h2>Employees</h2>
+<input id="code" placeholder="Code e.g. EMP003">
+<input id="first" placeholder="First name">
+<input id="last" placeholder="Last name">
+<input id="email" placeholder="Email">
+<input id="joined" type="date">
+<input id="salary" type="number" placeholder="Basic salary">
+<select id="dept"></select>
+<button onclick="addEmployee()">Add employee</button>
+<table>
+  <thead><tr><th>Code</th><th>Name</th><th>Department</th><th>Basic salary</th><th></th></tr></thead>
+  <tbody id="empRows"></tbody>
+</table>
+
+<h2>Loss of Pay (LOP) days</h2>
+<select id="lopEmp"></select>
+Year <input id="lopYear" type="number" value="2026" style="width:80px" onchange="safe(loadLop)">
+Month <input id="lopMonth" type="number" value="10" min="1" max="12" style="width:60px" onchange="safe(loadLop)">
+LOP days <input id="lopDays" type="number" value="0" min="0" max="31" step="0.5" style="width:70px">
+<button onclick="saveLop()">Save</button>
+<div id="lopList"></div>
+
+<h2>Payroll</h2>
+Year <input id="year" type="number" value="2026" style="width:80px">
+Month <input id="month" type="number" value="10" min="1" max="12" style="width:60px">
+<button onclick="runPayroll()">Run payroll</button>
+<div id="runList"></div>
+<div id="runView"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const show = t => $('msg').textContent = t || '';
+
+async function api(url, method = 'GET', body) {
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) {
+    let text = await res.text();
+    try {
+      const j = JSON.parse(text);
+      text = j.errors ? Object.values(j.errors).flat().join(' ') : (j.title || text);
+    } catch { }
+    throw new Error(text || res.statusText);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function safe(fn) {
+  try { show(''); await fn(); } catch (e) { show(e.message); }
+}
+
+/* ---------- Departments ---------- */
+async function loadDepartments() {
+  const list = await api('/api/departments');
+  $('deptList').textContent = list.length ? 'Existing: ' + list.map(d => d.name).join(', ') : 'No departments yet.';
+  $('dept').innerHTML = '<option value="">(no department)</option>' +
+    list.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+}
+
+function addDepartment() {
+  safe(async () => {
+    await api('/api/departments', 'POST', { name: $('deptName').value });
+    $('deptName').value = '';
+    await loadDepartments();
+  });
+}
+
+/* ---------- Employees ---------- */
+async function loadEmployees() {
+  const list = await api('/api/employees');
+  $('lopEmp').innerHTML = list.map(e => `<option value="${e.id}">${e.firstName} ${e.lastName}</option>`).join('');
+  $('empRows').innerHTML = list.map(e => `
+    <tr>
+      <td>${e.employeeCode}</td>
+      <td>${e.firstName} ${e.lastName}</td>
+      <td>${e.department ? e.department.name : '-'}</td>
+      <td>${e.basicSalary}</td>
+      <td><button onclick="deleteEmployee(${e.id})">Delete</button></td>
+    </tr>`).join('');
+}
+
+function addEmployee() {
+  safe(async () => {
+    await api('/api/employees', 'POST', {
+      employeeCode: $('code').value,
+      firstName: $('first').value,
+      lastName: $('last').value,
+      email: $('email').value,
+      dateOfJoining: $('joined').value,
+      basicSalary: Number($('salary').value),
+      departmentId: $('dept').value ? Number($('dept').value) : null
+    });
+    await loadEmployees();
+  });
+}
+
+function deleteEmployee(id) {
+  safe(async () => {
+    try {
+      await api('/api/employees/' + id, 'DELETE');
+    } catch {
+      throw new Error('Cannot delete: this employee probably has payslips.');
+    }
+    await loadEmployees();
+  });
+}
+
+/* ---------- Loss of Pay ---------- */
+async function loadLop() {
+  const list = await api(`/api/attendance?year=${$('lopYear').value}&month=${$('lopMonth').value}`);
+  $('lopList').innerHTML = list.length
+    ? '<table><thead><tr><th>Employee</th><th>LOP days</th></tr></thead><tbody>' +
+      list.map(a => `<tr><td>${a.employee.firstName} ${a.employee.lastName}</td><td>${a.lossOfPayDays}</td></tr>`).join('') +
+      '</tbody></table>'
+    : 'No LOP entries for this month.';
+}
+
+function saveLop() {
+  safe(async () => {
+    await api('/api/attendance', 'POST', {
+      employeeId: Number($('lopEmp').value),
+      year: Number($('lopYear').value),
+      month: Number($('lopMonth').value),
+      lossOfPayDays: Number($('lopDays').value)
+    });
+    await loadLop();
+  });
+}
+
+/* ---------- Payroll ---------- */
+async function loadRuns() {
+  const runs = await api('/api/payroll');
+  $('runList').innerHTML = runs.length
+    ? 'Past runs: ' + runs.map(r => `<button onclick="showRun(${r.id})">${r.month}/${r.year}</button>`).join('')
+    : 'No payroll has been run yet.';
+}
+
+function runPayroll() {
+  safe(async () => {
+    const run = await api(`/api/payroll/run?year=${$('year').value}&month=${$('month').value}`, 'POST');
+    await loadRuns();
+    renderRun(run);
+  });
+}
+
+function showRun(id) {
+  safe(async () => renderRun(await api('/api/payroll/' + id)));
+}
+
+function renderRun(run) {
+  const rows = run.payslips.map(p => `
+    <tr>
+      <td>${p.employee.firstName} ${p.employee.lastName}</td>
+      <td>${p.basicSalary}</td>
+      <td>${p.grossEarnings}</td>
+      <td>${p.lossOfPayDays}</td>
+      <td>${p.totalDeductions}</td>
+      <td><b>${p.netPay}</b></td>
+    </tr>`).join('');
+
+  $('runView').innerHTML = `
+    <h3>Payroll for ${run.month}/${run.year}</h3>
+    <table>
+      <thead><tr><th>Employee</th><th>Basic</th><th>Gross</th><th>LOP days</th><th>Deductions</th><th>Net pay</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><th>Total</th><th></th><th>${run.totalGross}</th><th></th><th>${run.totalDeductions}</th><th>${run.totalNet}</th></tr></tfoot>
+    </table>`;
+}
+
+/* ---------- Start ---------- */
+safe(async () => {
+  await loadDepartments();
+  await loadEmployees();
+  await loadRuns();
+  await loadLop();
+});
+</script>
+</body>
+</html>
